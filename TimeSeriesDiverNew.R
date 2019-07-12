@@ -8,6 +8,7 @@ library(lubridate)
 library(writexl)
 library(timeDate)
 library(rlist)
+library(ggforce)
 
 
 #Script Parameters and Tools
@@ -28,7 +29,9 @@ Referrals <- read_excel(ReferralFile,
 Referrals <- Referrals[-1,]
 Referrals$WeekEnding <- str_remove(Referrals$WeekEnding, "Week Ending ")
 Referrals$WeekEnding <- ymd(Referrals$WeekEnding)
-Referrals <- select(Referrals, WeekEnding, BookSpecialty, BookConsultant, Outcome, Referrals)
+Referrals$Period <- as.Date(timeLastDayInMonth(ymd(paste(Referrals$Period,"/01",sep="/"))))
+
+Referrals <- select(Referrals, MonthEnding = Period, WeekEnding, BookSpecialty, BookConsultant, Outcome, Referrals)
 
 #set the end period by rolling back to previous month end from the max week
 fullmonthmax <- rollback(max(Referrals$WeekEnding))
@@ -36,16 +39,15 @@ fullmonthmax <- rollback(max(Referrals$WeekEnding))
 #filter out unwanted
 Referrals <- Referrals %>%
   filter(Outcome == "Seen",
-         year(WeekEnding) != 2011,
-         WeekEnding <= fullmonthmax) %>%
+         year(MonthEnding) != 2011,
+         MonthEnding <= fullmonthmax) %>%
   filter(BookSpecialty %!in% filteroutspecials) %>%
-  group_by( WeekEnding, BookSpecialty) %>%
-  summarise(Referrals = sum(Referrals))
+  group_by( MonthEnding, BookSpecialty) %>%
+  summarise(Referrals = sum(Referrals, na.rm = TRUE))
 
 #OPD dataframe
 OPD <- lapply(1:numberyearsOPDdata, function(i) read_excel(Activityfile, sheet = i))
 OPD <- bind_rows(OPD)
-
 
 #Tidy up OPD Dataframe
 OPD$WeekEnding <- str_remove(OPD$WeekEnding, "Week Ending ")
@@ -53,47 +55,53 @@ OPD$WeekEnding <- str_remove(OPD$WeekEnding, "Week Ending ")
 OPD$NewReturn <- str_remove(OPD$NewReturn, " PATIENTS :")
 
 OPD$WeekEnding <- ymd(OPD$WeekEnding)
+OPD$Period <- as.Date(timeLastDayInMonth(ymd(paste(OPD$Period,"/01",sep="/"))))
 
-OPD <- select(OPD, WeekEnding, BookSpecialty, NewReturn, OPD = `O/P Count`, DNA = 'DNA Count') %>%
-  filter(WeekEnding <= fullmonthmax) %>%
-  filter(BookSpecialty %!in% filteroutspecials)
+OPD <- filter(OPD, WeekEnding <= fullmonthmax) %>%
+  select(MonthEnding = Period, BookSpecialty, NewReturn, OPD = `O/P Count`, DNA = 'DNA Count') %>%
+  filter(BookSpecialty %!in% filteroutspecials) %>%
+  group_by(MonthEnding, BookSpecialty, NewReturn) %>%
+  summarise(OPD = sum(OPD, na.rm = TRUE),
+            DNA = sum(DNA, na.rm = TRUE))
 
 OPD$NewReturn <- as.factor(OPD$NewReturn)
 
 
 OPDWIP <- NULL
 
+
+
+
 #Get the News
 OPDWIP$News <- OPD %>%
   filter(NewReturn == "NEW") %>%
-  group_by(WeekEnding, BookSpecialty) %>%
-  summarise(NewOPD  = sum(OPD), NewDNA = sum(DNA))
+  select(MonthEnding, BookSpecialty, NewOPD = OPD, NewDNA = DNA)
 
 #Get the Retunrs
 OPDWIP$Returns <- OPD %>%
   filter(NewReturn == "RETURN") %>%
-  group_by(WeekEnding, BookSpecialty) %>%
-  summarise(ReturnOPD = sum(OPD), ReturnDNA = sum(DNA))
+  select(MonthEnding, BookSpecialty, ReturnOPD = OPD, ReturnDNA = DNA)
 
 #Join them Together
-OPD <- full_join(OPDWIP$News, OPDWIP$Returns, by = c("WeekEnding", "BookSpecialty"))
+OPD <- full_join(OPDWIP$News, OPDWIP$Returns, by = c("MonthEnding", "BookSpecialty"))
 remove(OPDWIP)
 
 #Join them to the Referrals
-OPD <- full_join(OPD, Referrals, by = c("WeekEnding", "BookSpecialty"))
+OPD <- full_join(OPD, Referrals, by = c("MonthEnding", "BookSpecialty"))
 remove(Referrals)
+OPD[is.na(OPD)] <- 0
 
 #Set the Weekend to be month end dates
-OPD$WeekEnding <- as.Date(timeLastDayInMonth(as.character(OPD$WeekEnding)))
+# OPD$WeekEnding <- as.Date(timeLastDayInMonth(as.character(OPD$WeekEnding)))
 
-#Group and Sum by new date and specialty
-OPD <- OPD %>%
-  group_by(WeekEnding, BookSpecialty) %>%
-  summarise(NewOPD = sum(NewOPD, na.rm = TRUE),
-            NewDNA = sum(NewDNA, na.rm = TRUE),
-            ReturnOPD = sum(ReturnOPD, na.rm = TRUE),
-            ReturnDNA = sum(ReturnDNA, na.rm = TRUE),
-            Referrals = sum(Referrals, na.rm = TRUE))
+# # #Group and Sum by new date and specialty
+# OPD <- OPD %>%
+#   group_by(WeekEnding, BookSpecialty) %>%
+#   summarise(NewOPD = sum(NewOPD, na.rm = TRUE),
+#             NewDNA = sum(NewDNA, na.rm = TRUE),
+#             ReturnOPD = sum(ReturnOPD, na.rm = TRUE),
+#             ReturnDNA = sum(ReturnDNA, na.rm = TRUE),
+#             Referrals = sum(Referrals, na.rm = TRUE))
 
 
 #Split the OPD data based on Specialty
@@ -102,7 +110,7 @@ OPD <- split.data.frame(OPD, OPD$BookSpecialty)
 #Function to Convert Specialties to TS on Demand
 converttoMxts <- function(x) {
   x_matrix <- as.matrix(x$Referrals)
-  na.fill(as.xts(x_matrix,order.by = x$WeekEnding, frequency = 12), fill = 0)
+  na.fill(as.xts(x_matrix,order.by = x$MonthEnding, frequency = 12), fill = 0)
 }
 
 #Create 80% Confidence Forecast Function
@@ -122,14 +130,14 @@ ForecastOutput <- lapply(OPD, CreateDemandForecasts)
 
 #Create The Forecast Dates
 forecastindex <- fullmonthmax %m+% months(1:forecastperiod)
-names(forecastindex) <- "WeekEnding"
+names(forecastindex) <- "MonthEnding"
 combineforecastsandindex <- function(x) {
   cbind.data.frame(forecastindex,x)
 }
 
 #Fix Column Names function
 fixnames <- function(x) {
-  x <- setNames(x, c("WeekEnding", "Forecast", "80% Upper", "80% Lower"))
+  x <- setNames(x, c("MonthEnding", "Forecast", "80% Upper", "80% Lower"))
 }
 
 #Combine the forecasts with the index and fix the names, then make it a Data Frame
@@ -156,8 +164,8 @@ combined <- bind_rows(combinedOPD, combinedforecasts)
 
 
 #Arrange the combined data frame and rename the date to Month Ending
-combined <- arrange(combined, BookSpecialty, WeekEnding)
-names(combined)[names(combined) == "WeekEnding"] <- "MonthEnding"
+combined <- arrange(combined, BookSpecialty, MonthEnding)
+# names(combined)[names(combined) == "WeekEnding"] <- "MonthEnding"
 
 
 #Roll last available rolling average forward with the predictions
@@ -181,7 +189,7 @@ combined <- combined %>%
 
 #Output it all to an Excel file
 write_xlsx(combined, "DiverForecasts.xlsx", col_names = TRUE)
-
+save(combined, file = "DiverForecasts.RData")
 
 
 
@@ -205,8 +213,8 @@ combinedNNforecasts <- bind_rows(ForecastNNOutput, .id = "BookSpecialty")
  
 combinedNN <- bind_rows(combinedOPD, combinedNNforecasts)
  
-combinedNN <- arrange(combinedNN, BookSpecialty, WeekEnding)
-names(combinedNN)[names(combinedNN) == "WeekEnding"] <- "MonthEnding"
+combinedNN <- arrange(combinedNN, BookSpecialty, MonthEnding)
+# names(combinedNN)[names(combinedNN) == "WeekEnding"] <- "MonthEnding"
 
 #Roll last available rolling average forward with the predictions
 OPDtestNN <- split.data.frame(combinedNN, combinedNN$BookSpecialty)
@@ -220,3 +228,22 @@ combinedNN <- combinedNN %>%
 # 
 write_xlsx(combinedNN, "DiverForecastsNN.xlsx", col_names = TRUE)
 }
+
+length(unique(combined$MonthEnding))
+
+listforplotting <- split.data.frame(combined, combined$BookSpecialty)
+
+ggplotref <- function(DF) {
+  ggplot(data = DF, aes(x = MonthEnding))+
+    geom_line(aes(y = Referrals, col = 'Referrals'), size = 1.1, col = 'red')+
+    geom_line(aes(y = Forecast), size = 1.1 , col ='red')+
+    geom_line(aes(y = `80% Upper`, col = 'Esitmate Limits'),size = 1.1, col = 'pink')+
+    geom_line(aes(y = `80% Lower`), size = 1.1, col = 'pink')+
+    geom_line(aes(y = OvCapAvg, col = "New Appointments"), size = 1.1, col = 'blue')+
+    theme_minimal()+
+    expand_limits(y=0)
+}
+
+ggplots <- lapply(listforplotting, ggplotref)
+ggplots$`Breast Surgery`
+ggplots$`Plastic Surgery`
