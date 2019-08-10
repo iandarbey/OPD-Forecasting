@@ -234,16 +234,19 @@ length(unique(combined$MonthEnding))
 listforplotting <- split.data.frame(combined, combined$BookSpecialty)
 
 ggplotref <- function(DF) {
+  plottitle <- head(DF$BookSpecialty,1)
   ggplot(data = DF, aes(x = MonthEnding))+
     geom_line(aes(y = Referrals, col = 'Referrals'), size = 1.1, col = 'red')+
+    geom_ribbon(aes(ymin = `80% Lower`, ymax = `80% Upper`), col = "grey50", fill = "grey50", alpha = 0.3)+
     geom_line(aes(y = Forecast), size = 1.1 , col ='red')+
-    geom_line(aes(y = `80% Upper`, col = 'Esitmate Limits'),size = 1.1, col = 'pink')+
-    geom_line(aes(y = `80% Lower`), size = 1.1, col = 'pink')+
     geom_line(aes(y = OvCapAvg, col = "New Appointments"), size = 1.1, col = 'blue')+
     theme_minimal()+
-    expand_limits(y=0)
+    expand_limits(y=0)+
+    ggtitle(plottitle)
 }
 
 ggplots <- lapply(listforplotting, ggplotref)
 ggplots$`Breast Surgery`
 ggplots$`Plastic Surgery`
+
+ggplots
