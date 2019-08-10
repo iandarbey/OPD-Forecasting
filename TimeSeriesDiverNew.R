@@ -18,7 +18,11 @@ NeuralnetIterations <- 20
 rollperiod <- 6
 forecastperiod <- 12
 numberyearsOPDdata <- 8
-filteroutspecials <- c("Pallitive Care", "Diabetic Day Centre", "Chiropody", "Neurophysiology", "General Medical", "OMNITEST", "Oncology Radiation")
+filteroutspecials <- c("Pallitive Care", "Diabetic Day Centre",
+                       "Chiropody", "Neurophysiology", "General Medical",
+                       "OMNITEST", "Oncology Radiation", "Detoxification",
+                       "Microbiology", "Maxillo-Facial",
+                       "Orthoptics")
 '%!in%' <- function(x,y)!('%in%'(x,y))
 ReferralFile <- "OPD Referrals.xlsx"
 ReferralsSheet <- "Referrals"
@@ -233,7 +237,7 @@ write_xlsx(combinedNN, "DiverForecastsNN.xlsx", col_names = TRUE)
 length(unique(combined$MonthEnding))
 
 listforplotting <- split.data.frame(combined, combined$BookSpecialty)
-
+DF
 ggplotref <- function(DF) {
   plottitle <- head(DF$BookSpecialty,1)
   reflabelmonth <- month(DF$MonthEnding[length(DF$MonthEnding)-6], label = TRUE)
@@ -244,7 +248,7 @@ ggplotref <- function(DF) {
     geom_line(aes(y = Referrals, col = 'Referrals'), size = 1.1, col = 'red')+
     geom_ribbon(aes(ymin = `80% Lower`, ymax = `80% Upper`), col = "grey50", fill = "grey50", alpha = 0.3)+
     geom_line(aes(y = Forecast), size = 1.1 , col ='red')+
-    geom_line(aes(y = OvCapAvg, col = "New Appointments"), size = 1.1, col = 'blue')+
+    geom_line(aes(y = OvCapAvg), size = 1.1, col = 'blue')+
     theme_bw()+
     theme_update(plot.title = element_text(hjust = 0.5))+
     expand_limits(y=0)+
@@ -260,15 +264,9 @@ ggplotref <- function(DF) {
                #arrow = arrow(length = unit(0.02, "npc"), type = "open", ends = "last"),
                #point.padding = 1,
                position = position_nudge(y = 20))+
-    geom_point(data = DF[nrow(DF)-6,],
-               aes(x = MonthEnding,
-                   y = Forecast),
-               fill = 'red',
-               shape = 23,
-               size = 5)+
     geom_label(data = DF[nrow(DF)-6,],
-                     aes(x = MonthEnding,
-                         y = OvCapAvg),
+               aes(x = MonthEnding,
+                   y = OvCapAvg),
                label = paste0(reflabelmonth, " ",
                               reflabelyear,
                               " Expected capacity - ",
@@ -279,6 +277,12 @@ ggplotref <- function(DF) {
                position = position_nudge(y = -20))+
     geom_point(data = DF[nrow(DF)-6,],
                aes(x = MonthEnding,
+                   y = Forecast),
+               fill = 'red',
+               shape = 23,
+               size = 5)+
+    geom_point(data = DF[nrow(DF)-6,],
+               aes(x = MonthEnding,
                    y = OvCapAvg),
                fill = 'blue',
                shape = 23,
@@ -286,6 +290,16 @@ ggplotref <- function(DF) {
 }
 
 ggplots <- lapply(listforplotting, ggplotref)
+
 ggplots$`Breast Surgery`
 ggplots$`Plastic Surgery`
 
+
+bulk_save <- function(x) {
+  ggsave(filename = paste0("plots\\",x$data$BookSpecialty[1],".jpeg"),
+         device = "jpeg", width = 16, height = 9, units = "in",
+         dpi = 300, plot = x)
+}
+
+
+lapply(ggplots, bulk_save)
