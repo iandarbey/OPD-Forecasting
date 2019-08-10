@@ -1,3 +1,4 @@
+library(scales)
 library(xts)
 library(dplyr)
 library(tidyverse)
@@ -9,7 +10,7 @@ library(writexl)
 library(timeDate)
 library(rlist)
 library(ggforce)
-
+library(ggrepel)
 
 #Script Parameters and Tools
 RunNeuralNet <- FALSE
@@ -235,18 +236,56 @@ listforplotting <- split.data.frame(combined, combined$BookSpecialty)
 
 ggplotref <- function(DF) {
   plottitle <- head(DF$BookSpecialty,1)
+  reflabelmonth <- month(DF$MonthEnding[length(DF$MonthEnding)-6], label = TRUE)
+  reflabelyear <- year(DF$MonthEnding[length(DF$MonthEnding)-6])
+  reflabelval <- DF$Forecast[length(DF$Forecast)-6]
+  actlabelval <- DF$OvCapAvg[length(DF$OvCapAvg)-6]
   ggplot(data = DF, aes(x = MonthEnding))+
     geom_line(aes(y = Referrals, col = 'Referrals'), size = 1.1, col = 'red')+
     geom_ribbon(aes(ymin = `80% Lower`, ymax = `80% Upper`), col = "grey50", fill = "grey50", alpha = 0.3)+
     geom_line(aes(y = Forecast), size = 1.1 , col ='red')+
     geom_line(aes(y = OvCapAvg, col = "New Appointments"), size = 1.1, col = 'blue')+
-    theme_minimal()+
+    theme_bw()+
+    theme_update(plot.title = element_text(hjust = 0.5))+
     expand_limits(y=0)+
-    ggtitle(plottitle)
+    ggtitle(plottitle)+
+    labs(title = plottitle, x = "Month Ending")+
+    geom_label(data = DF[nrow(DF)-6,],
+                     aes(x = MonthEnding,
+                         y = Forecast),
+               label = paste0(reflabelmonth," ",
+                              reflabelyear,
+                              " Forecasted Referrals - ",
+                              round(reflabelval,0)),
+               #arrow = arrow(length = unit(0.02, "npc"), type = "open", ends = "last"),
+               #point.padding = 1,
+               position = position_nudge(y = 20))+
+    geom_point(data = DF[nrow(DF)-6,],
+               aes(x = MonthEnding,
+                   y = Forecast),
+               fill = 'red',
+               shape = 23,
+               size = 5)+
+    geom_label(data = DF[nrow(DF)-6,],
+                     aes(x = MonthEnding,
+                         y = OvCapAvg),
+               label = paste0(reflabelmonth, " ",
+                              reflabelyear,
+                              " Expected capacity - ",
+                              round(actlabelval,0)),
+               #arrow = arrow(length = unit(0.02, "npc"), type = "open", ends = "last"),
+               #point.padding = 1,
+               #direction = "y",
+               position = position_nudge(y = -20))+
+    geom_point(data = DF[nrow(DF)-6,],
+               aes(x = MonthEnding,
+                   y = OvCapAvg),
+               fill = 'blue',
+               shape = 23,
+               size = 5)
 }
 
 ggplots <- lapply(listforplotting, ggplotref)
 ggplots$`Breast Surgery`
 ggplots$`Plastic Surgery`
 
-ggplots
