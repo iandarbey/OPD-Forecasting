@@ -249,7 +249,7 @@ ggplotref <- function(DF) {
     geom_ribbon(aes(ymin = `80% Lower`, ymax = `80% Upper`), col = "grey50", fill = "grey50", alpha = 0.3)+
     geom_line(aes(y = Forecast, col = 'Forecast'), size = 1.1)+
     geom_line(aes(y = OvCapAvg, col = 'OvCapAvg'), size = 1.1)+
-    theme_bw()+
+    theme_minimal()+
     expand_limits(y=0)+
     labs(title = plottitle, x = "Month Ending",
          subtitle = paste0(reflabelmonth, " ",
@@ -276,10 +276,11 @@ ggplotref <- function(DF) {
     scale_color_manual(values = c("Referrals" = 'red', 
                                   "Forecast" = 'red',
                                   "OvCapAvg" = 'blue'))+
+    theme_bw()+
     theme_update(legend.position = "top",
                  text = element_text(family = "serif"),
                  plot.title = element_text(hjust = 0.5, face = "bold"),
-                 plot.subtitle = element_text(hjust = 0.5),
+                 plot.subtitle = element_text(hjust = 0.5,face = "bold"),
                  axis.title.x = element_text(face = "bold"),
                  axis.title.y = element_text(face = "bold"))
 }
@@ -299,3 +300,4 @@ bulk_save <- function(x) {
 
 
 lapply(ggplots, bulk_save)
+
