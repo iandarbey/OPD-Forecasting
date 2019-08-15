@@ -38,16 +38,6 @@ server <- function(input, output) {
     DF <- reactive({
         combined <- dplyr::filter(combined, BookSpecialty == input$specialty)
     })
-    plottitle <- reactive({DF$BookSpecialty[1]
-    })
-    reflabelmonth <- reactive({month(DF$MonthEnding[length(DF$MonthEnding)-6], label = TRUE)
-    })
-    reflabelyear <- reactive({year(DF$MonthEnding[length(DF$MonthEnding)-6])
-    })
-    reflabelval <- reactive({DF$Forecast[length(DF$Forecast)-6]
-    })
-    actlabelval <- reactive({DF$OvCapAvg[length(DF$OvCapAvg)-6]
-    })
     output$Plot <- renderPlotly({
         print(
             ggplotly(
@@ -58,16 +48,18 @@ server <- function(input, output) {
                         geom_line(aes(y = OvCapAvg, col = 'OvCapAvg'), size = 1.1)+
                         theme_minimal()+
                         expand_limits(y=0)+
-                        # labs(title = plottitle(), x = "Month Ending",
-                        #      subtitle = paste0(reflabelmonth(), " ",
-                        #                        reflabelyear(),
-                        #                        "    -    ",
-                        #                        " Forecasted Referrals - ",
-                        #                        round(reflabelval(),0),
-                        #                        "    -    ",
-                        #                        "Expected capacity - ",
-                        #                        round(actlabelval(),0)),
-                        #      color = "Measure")+
+                        labs(title =  paste0(DF()$BookSpecialty[1],
+                                             "  -  ",
+                                             month(nth(DF()$MonthEnding,-7),label = TRUE),
+                                             " ",
+                                             year(nth(DF()$MonthEnding,-7)),
+                                             " - ",
+                                             "Forecast - ",
+                                             round(nth(DF()$Forecast,-7),0),
+                                             "  -  Capacity - ",
+                                             round(nth(DF()$OvCapAvg,-7),0)),
+                             x = "Month Ending",
+                             color = "Measure")+
                         geom_point(data = DF()[nrow(DF())-6,],
                                    aes(x = MonthEnding,
                                        y = Forecast),
@@ -91,9 +83,7 @@ server <- function(input, output) {
                                      axis.title.x = element_text(face = "bold"),
                                      axis.title.y = element_text(face = "bold"))
             ))
-        # draw the histogram with the specified number of bins
-        
-    })
+        })
 }
 
 # Run the application 
