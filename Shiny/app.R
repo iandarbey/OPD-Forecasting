@@ -26,7 +26,7 @@ ui <- fluidPage(
         ),
 
         # Show a plot of the generated distribution
-        mainPanel(plotlyOutput("Plot", height = "750px", width = "1200px")
+        mainPanel(plotlyOutput("Plot", height = "750px", width = "1850px")
         )
     )
 )
@@ -36,7 +36,9 @@ server <- function(input, output) {
     load("DiverForecasts.RData")
     specialtys <- unique(combined$BookSpecialty)
     DF <- reactive({
-        combined <- dplyr::filter(combined, BookSpecialty == input$specialty)
+        combined <- dplyr::filter(combined, BookSpecialty == input$specialty) %>%
+            mutate(Forecast = round(Forecast,0), OvCapAvg = round(OvCapAvg,0),
+                   `80% Lower` = round(`80% Lower`,0), `80% Upper` = round(`80% Upper`,0) )
     })
     output$Plot <- renderPlotly({
         print(
@@ -82,7 +84,8 @@ server <- function(input, output) {
                                      plot.subtitle = element_text(hjust = 0.5,face = "bold"),
                                      axis.title.x = element_text(face = "bold"),
                                      axis.title.y = element_text(face = "bold"))
-            ))
+            )
+            )
         })
 }
 
